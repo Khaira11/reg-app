@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=192.168.117.188
+      - DB_USER=postgres
+      - DB_PASSWORD=your_password_here
+      - DB_NAME=registration_db
+      - DB_PORT=5432
+    restart: unless-stopped
+    # Remove depends_on since we're using external DB
+    # Remove volumes if you don't need development mounting
+
+volumes:
+  # No need for db_data volume since we're using external DB

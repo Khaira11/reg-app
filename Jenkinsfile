@@ -33,7 +33,7 @@ pipeline {
         stage('Test K8s Connection') {
             steps {
                 script {
-                    configFileProvider([configFile(fileId: 'k8s-config', variable: 'KUBECONFIG')]) {
+                    configFileProvider([configFile(fileId: 'k8s-credentials', variable: 'KUBECONFIG')]) {
                         sh '''
                             echo "Testing Kubernetes connection..."
                             kubectl --kubeconfig=$KUBECONFIG cluster-info
@@ -47,7 +47,7 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    configFileProvider([configFile(fileId: 'k8s-config', variable: 'KUBECONFIG')]) {
+                    configFileProvider([configFile(fileId: 'k8s-credentials', variable: 'KUBECONFIG')]) {
                         sh '''
                             echo "Deploying to Kubernetes..."
                             kubectl --kubeconfig=$KUBECONFIG apply -f k8s/ --validate=false

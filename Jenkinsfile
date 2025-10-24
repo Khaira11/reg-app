@@ -1,66 +1,82 @@
 pipeline {
     agent any
-
+    
     environment {
-        IMAGE_NAME = 'khaira23/flask-jenkins:latest'
-        DEPLOYMENT_NAME = 'flask-deployment'
-        NAMESPACE = 'default'
+        DOCKER_IMAGE = "khaira23/flask-jenkins"
+        K8S_NAMESPACE = "default"
     }
-
+    
     stages {
-
         stage('Build Docker Image') {
             steps {
                 echo '🔨 Building Docker image'
-                sh 'docker build -t $IMAGE_NAME .'
+                sh 'docker build -t ${DOCKER_IMAGE}:latest .'
             }
         }
-
+        
         stage('Login & Push to DockerHub') {
             steps {
                 echo '🔐 Logging in to DockerHub'
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub-credentials',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
                     sh '''
                         echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-                        docker push $IMAGE_NAME
+                        docker push ${DOCKER_IMAGE}:latest
                     '''
                 }
             }
         }
-
+        
+        stage('Test K8s Connection') {
+            steps {
+                script {
+                    configFileProvider([configFile(fileId: 'k8s-config', variable: 'KUBECONFIG')]) {
+                        sh '''
+                            echo "Testing Kubernetes connection..."
+                            kubectl --kubeconfig=$KUBECONFIG cluster-info
+                            kubectl --kubeconfig=$KUBECONFIG get nodes
+                        '''
+                    }
+                }
+            }
+        }
+        
         stage('Deploy to Kubernetes') {
             steps {
-                echo '☸️ Deploying application to Kubernetes...'
-                withKubeConfig([credentialsId: 'k8s-credentials']) {
-                    sh '''
-                        # Apply Deployment and Service files
-                        kubectl apply -f k8s/deployment.yaml
-                        kubectl apply -f k8s/service.yaml
-
-                        # Optional: Wait for rollout to complete
-                        kubectl rollout status deployment/$DEPLOYMENT_NAME -n $NAMESPACE
-                    '''
+                script {
+                    configFileProvider([configFile(fileId: 'k8s-config', variable: 'KUBECONFIG')]) {
+                        sh '''
+                            echo "Deploying to Kubernetes..."
+                            kubectl --kubeconfig=$KUBECONFIG apply -f k8s/ --validate=false
+                            sleep 15
+                            kubectl --kubeconfig=$KUBECONFIG get all -l app=flask-app
+                        '''
+                    }
                 }
             }
         }
-
+        
         stage('Verify Deployment') {
             steps {
-                echo '🔍 Checking application status'
-                withKubeConfig([credentialsId: 'k8s-credentials']) {
-                    sh '''
-                        kubectl get pods -n $NAMESPACE
-                        kubectl get svc -n $NAMESPACE
-                    '''
+                script {
+                    configFileProvider([configFile(fileId: 'k8s-config', variable: 'KUBECONFIG')]) {
+                        sh '''
+                            echo "Verifying deployment..."
+                            kubectl --kubeconfig=$KUBECONFIG rollout status deployment/flask-app --timeout=300s
+                            kubectl --kubeconfig=$KUBECONFIG get services
+                        '''
+                    }
                 }
             }
         }
     }
-
+    
     post {
         always {
             echo '🎉 Pipeline execution completed'
         }
     }
 }
-

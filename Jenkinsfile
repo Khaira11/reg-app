@@ -62,7 +62,7 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 script {
-                    configFileProvider([configFile(fileId: 'k8s-config', variable: 'KUBECONFIG')]) {
+                    configFileProvider([configFile(fileId: 'k8s-credentials', variable: 'KUBECONFIG')]) {
                         sh '''
                             echo "Verifying deployment..."
                             kubectl --kubeconfig=$KUBECONFIG rollout status deployment/flask-app --timeout=300s
